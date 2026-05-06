@@ -68,7 +68,7 @@ def write_events_json(data):
 
 
 _last_heartbeat_push = 0
-HEARTBEAT_INTERVAL = 60  # only push heartbeat at most once per N seconds
+HEARTBEAT_INTERVAL = 300  # 5 min — heartbeat-only commits throttle (avoids spamming bridge git log)
 
 
 def push_step():
