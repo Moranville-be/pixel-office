@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>🌍 Moranville Bridge — Pixel Office</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #0d1117;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: #e6edf3;
+    overflow: hidden;
+  }
+  body {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    height: 100vh;
+  }
+
+  /* ─── Stage ─── */
+  .stage-wrap { background: linear-gradient(180deg, #1c2128 0%, #0d1117 100%);
+    display: flex; flex-direction: column; overflow: hidden; }
+  .stage-header { padding: 14px 22px; border-bottom: 1px solid #21262d;
+    display: flex; justify-content: space-between; align-items: center; }
+  .stage-header h1 { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .stage-header .live { font-size: 12px; color: #7ee787; display: flex; align-items: center; gap: 6px; }
+  .stage-header .live::before { content: ''; width: 8px; height: 8px; border-radius: 50%;
+    background: #3fb950; box-shadow: 0 0 8px #3fb950; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+
+  .controls { padding: 8px 22px; border-bottom: 1px solid #21262d;
+    display: flex; gap: 6px; flex-wrap: wrap; }
+  .ctrl-btn { background: #21262d; border: 1px solid #30363d; color: #e6edf3;
+    font-family: inherit; font-size: 11px; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+  .ctrl-btn:hover { background: #30363d; border-color: #58a6ff; }
+  .ctrl-btn.primary { background: #1f6feb; border-color: #1f6feb; }
+  .ctrl-btn.primary:hover { background: #388bfd; }
+
+  .office { flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 12px; overflow: auto;
+    image-rendering: pixelated; image-rendering: -moz-crisp-edges; }
+
+  /* ─── Room (extended layout) ─── */
+  /* tile = 36px (16 src × ~2.25). Room = 24 cols × 14 rows = 864×504 */
+  .room {
+    --tile: 36px;
+    --char-w: var(--tile);
+    --char-h: calc(var(--tile) * 2);
+    width: calc(var(--tile) * 24);
+    height: calc(var(--tile) * 14);
+    position: relative;
+    background:
+      repeating-linear-gradient(0deg,
+        #6b4d3a 0px, #6b4d3a 2px,
+        #5a3f2f 2px, #5a3f2f var(--tile)),
+      repeating-linear-gradient(90deg,
+        rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) var(--tile),
+        transparent var(--tile), transparent calc(var(--tile) * 2));
+    border: 4px solid #2d3138;
+    border-radius: 8px;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.6), inset 0 0 80px rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+  .wall { position: absolute; top: 0; left: 0; right: 0;
+    height: calc(var(--tile) * 1.5);
+    background: linear-gradient(180deg, #3a3f47 0%, #2d3138 100%);
+    border-bottom: 4px solid #1f2227; }
+  .door { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: calc(var(--tile) * 1.5); height: calc(var(--tile) * 0.7);
+    background: linear-gradient(180deg, #4a3220, #2d1f14);
+    border-top: 3px solid #1a0f08;
+    border-left: 3px solid #1a0f08;
+    border-right: 3px solid #1a0f08;
+    border-radius: 4px 4px 0 0; z-index: 1; }
+  .door::before { content: '🚪'; position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: #7d8590; }
+
+  /* Paintings */
+  .painting { position: absolute; width: calc(var(--tile) * 1.2); height: calc(var(--tile) * 0.7);
+    border: 2px solid #d2a679; box-shadow: 2px 2px 0 rgba(0,0,0,0.4);
+    top: calc(var(--tile) * 0.3); }
+  .painting.p1 { left: calc(var(--tile) * 3); background: linear-gradient(135deg, #58a6ff, #1f6feb); }
+  .painting.p3 { left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #7ee787, #3fb950); }
+  .painting.p2 { right: calc(var(--tile) * 3); background: linear-gradient(135deg, #f0883e, #db6d28); }
+
+  /* Zones (orchestrators) */
+  .zone-c1 { position: absolute; top: calc(var(--tile) * 1.6); left: calc(var(--tile) * 1.5);
+    background: rgba(31, 111, 235, 0.08); border: 1px dashed rgba(88, 166, 255, 0.3);
+    border-radius: 4px;
+    width: calc(var(--tile) * 4); height: calc(var(--tile) * 3); }
+  .zone-c2 { position: absolute; top: calc(var(--tile) * 1.6); right: calc(var(--tile) * 1.5);
+    background: rgba(240, 136, 62, 0.08); border: 1px dashed rgba(240, 136, 62, 0.3);
+    border-radius: 4px;
+    width: calc(var(--tile) * 4); height: calc(var(--tile) * 3); }
+  .zone-label { position: absolute; font-size: 9px; color: #7d8590;
+    text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+    pointer-events: none; }
+  .zone-label.c1 { top: calc(var(--tile) * 1.7); left: calc(var(--tile) * 1.6); color: #58a6ff; }
+  .zone-label.c2 { top: calc(var(--tile) * 1.7); right: calc(var(--tile) * 1.6); color: #f0883e; }
+  .zone-label.team1 { top: calc(var(--tile) * 5.2); left: calc(var(--tile) * 1.5); color: #58a6ff; }
+  .zone-label.team2 { top: calc(var(--tile) * 5.2); right: calc(var(--tile) * 1.5); color: #f0883e; }
+
+  /* Orchestrator desks */
+  .desk-c1 { position: absolute; left: calc(var(--tile) * 1.5); top: calc(var(--tile) * 3);
+    width: calc(var(--tile) * 3); height: calc(var(--tile) * 2); }
+  .desk-c2 { position: absolute; right: calc(var(--tile) * 1.5); top: calc(var(--tile) * 3);
+    width: calc(var(--tile) * 3); height: calc(var(--tile) * 2); }
+  .pc-c1 { position: absolute; left: calc(var(--tile) * 2.5); top: calc(var(--tile) * 2);
+    width: var(--tile); height: calc(var(--tile) * 2); z-index: 2; }
+  .pc-c2 { position: absolute; right: calc(var(--tile) * 2.5); top: calc(var(--tile) * 2);
+    width: var(--tile); height: calc(var(--tile) * 2); z-index: 2; }
+  .bookshelf-center { position: absolute; left: 50%; transform: translateX(-50%);
+    top: calc(var(--tile) * 1.6); width: calc(var(--tile) * 2); height: var(--tile); z-index: 1; }
+
+  /* Team desks: 2 grilles 5×2 (10 desks par équipe). */
+  /* Chaque desk = 1 tile × 1 tile, avec PC dessus. */
+  .team-grid {
+    position: absolute;
+    display: grid;
+    grid-template-columns: repeat(5, var(--tile));
+    grid-template-rows: repeat(2, calc(var(--tile) * 2));
+    gap: calc(var(--tile) * 0.5);
+    top: calc(var(--tile) * 6);
+  }
+  .team-grid.team-1 { left: calc(var(--tile) * 1.5); }
+  .team-grid.team-2 { right: calc(var(--tile) * 1.5); }
+  .small-desk {
+    position: relative;
+    background: #4a3a2a;
+    border: 2px solid #2d2419;
+    border-radius: 3px;
+    box-shadow: 0 1px 0 #1f1810;
+  }
+  .small-desk::before {
+    /* PC sur le desk */
+    content: '';
+    position: absolute;
+    top: -8px; left: 50%; transform: translateX(-50%);
+    width: 14px; height: 14px;
+    background: #1a1a1a;
+    border: 2px solid #3a3a3a;
+    box-shadow: inset 0 0 4px #58a6ff;
+  }
+  .small-desk[data-occupied="true"]::before {
+    box-shadow: inset 0 0 6px #3fb950;
+  }
+  .small-desk-num {
+    position: absolute; bottom: 1px; left: 2px;
+    font-size: 7px; color: #7d8590; font-family: 'JetBrains Mono', monospace;
+  }
+  .plant-l { position: absolute; left: calc(var(--tile) * 0.2); top: calc(var(--tile) * 11.5);
+    width: var(--tile); height: calc(var(--tile) * 2); }
+  .plant-r { position: absolute; right: calc(var(--tile) * 0.2); top: calc(var(--tile) * 11.5);
+    width: var(--tile); height: calc(var(--tile) * 2); }
+
+  /* ─── Sprite system ─── */
+  /* Each char_*.png is 112×96 = 7 cols × 3 rows of 16×32 cells. Scaled by --tile/16. */
+  .sprite { position: absolute; width: var(--char-w); height: var(--char-h);
+    cursor: pointer; z-index: 10;
+    transition: left 0.45s linear, top 0.45s linear; }
+  .sprite-inner { width: 100%; height: 100%;
+    background-size: calc(var(--tile) * 7) calc(var(--tile) * 6);
+    image-rendering: pixelated; background-position: 0 0; }
+  .sprite[data-flip="true"] .sprite-inner { transform: scaleX(-1); }
+  .sprite[data-dir="down"]  .sprite-inner { background-position-y: 0; }
+  .sprite[data-dir="up"]    .sprite-inner { background-position-y: calc(var(--tile) * -2); }
+  .sprite[data-dir="right"] .sprite-inner,
+  .sprite[data-dir="left"]  .sprite-inner { background-position-y: calc(var(--tile) * -4); }
+
+  .sprite[data-state="idle"] .sprite-inner { background-position-x: 0; }
+  .sprite[data-state="walking"] .sprite-inner { animation: walk-cycle 0.5s steps(1) infinite; }
+  @keyframes walk-cycle {
+    0%, 100% { background-position-x: 0; }
+    25%      { background-position-x: calc(var(--tile) * -1); }
+    50%      { background-position-x: calc(var(--tile) * -2); }
+    75%      { background-position-x: calc(var(--tile) * -1); }
+  }
+  .sprite[data-state="typing"] .sprite-inner { animation: typing-cycle 0.4s steps(1) infinite; }
+  @keyframes typing-cycle {
+    0%, 100% { background-position-x: calc(var(--tile) * -3); }
+    50%      { background-position-x: calc(var(--tile) * -4); }
+  }
+  .sprite[data-state="reading"] .sprite-inner { animation: reading-cycle 0.6s steps(1) infinite; }
+  @keyframes reading-cycle {
+    0%, 100% { background-position-x: calc(var(--tile) * -5); }
+    50%      { background-position-x: calc(var(--tile) * -6); }
+  }
+  .sprite.spawning .sprite-inner { animation: spawn-pop 0.4s ease-out; }
+  @keyframes spawn-pop { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .sprite.leaving .sprite-inner { animation: leave-fade 0.4s ease-in forwards; }
+  @keyframes leave-fade { 0% { opacity: 1; } 100% { opacity: 0; transform: scale(0.5); } }
+
+  .sprite[data-char="0"] .sprite-inner { background-image: url('sprites/char_0.png'); }
+  .sprite[data-char="1"] .sprite-inner { background-image: url('sprites/char_1.png'); }
+  .sprite[data-char="2"] .sprite-inner { background-image: url('sprites/char_2.png'); }
+  .sprite[data-char="3"] .sprite-inner { background-image: url('sprites/char_3.png'); }
+  .sprite[data-char="4"] .sprite-inner { background-image: url('sprites/char_4.png'); }
+  .sprite[data-char="5"] .sprite-inner { background-image: url('sprites/char_5.png'); }
+
+  .sprite::after {
+    content: attr(data-name);
+    position: absolute;
+    top: -14px; left: 50%; transform: translateX(-50%);
+    font-size: 8px; font-weight: 600; color: #e6edf3;
+    background: #21262d; padding: 1px 5px; border-radius: 3px;
+    border: 1px solid #30363d; white-space: nowrap; pointer-events: none;
+  }
+  .sprite[data-orchestrator="true"]::after { background: #1f6feb; border-color: #58a6ff; font-size: 9px; }
+  .sprite.selected { filter: drop-shadow(0 0 6px #58a6ff) drop-shadow(0 0 12px #58a6ff); }
+  .sprite.team-1::after { background: rgba(31, 111, 235, 0.85); border-color: #58a6ff; }
+  .sprite.team-2::after { background: rgba(240, 136, 62, 0.85); border-color: #f0883e; }
+
+  /* Badge subagent count on orchestrators */
+  .sprite[data-sub-count]::before {
+    content: attr(data-sub-count);
+    position: absolute;
+    top: -10px; right: -10px;
+    background: #d29922;
+    color: #0d1117;
+    font-size: 10px;
+    font-weight: 700;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid #161b22;
+    z-index: 12;
+    animation: pulse-badge 2s ease-in-out infinite;
+  }
+  @keyframes pulse-badge {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(210, 153, 34, 0.6); }
+    50%      { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(210, 153, 34, 0); }
+  }
+
+  /* Typing indicator in terminal */
+  .terminal .line.typing-indicator { color: #7d8590; font-style: italic; }
+  .terminal .line.typing-indicator .dots {
+    display: inline-block;
+    animation: typing-dots 1.2s steps(4) infinite;
+  }
+  @keyframes typing-dots {
+    0%   { content: '.'; }
+    25%  { content: '..'; }
+    50%  { content: '...'; }
+    75%  { content: '....'; }
+    100% { content: '.'; }
+  }
+  .terminal .line.typing-indicator::before { content: '⏳ '; }
+
+  /* Bubble */
+  .bubble { position: absolute; background: white; color: #0d1117;
+    font-size: 10px; font-weight: 500; padding: 4px 8px; border-radius: 6px;
+    border: 2px solid #21262d; box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+    pointer-events: none; z-index: 11;
+    transform: translate(-50%, -130%); white-space: nowrap;
+    animation: bubble-pop 0.3s ease-out; }
+  .bubble::after { content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 6px solid transparent;
+    border-right: 6px solid transparent; border-top: 8px solid white; }
+  @keyframes bubble-pop {
+    from { transform: translate(-50%, -130%) scale(0); }
+    to   { transform: translate(-50%, -130%) scale(1); } }
+
+  /* ─── Sidebar ─── */
+  .sidebar { background: #161b22; border-left: 1px solid #21262d;
+    display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-section { padding: 14px 16px; border-bottom: 1px solid #21262d; }
+  .sidebar-section h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: #7d8590; margin-bottom: 10px; font-weight: 600; }
+  .agent-row { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px;
+    align-items: center; padding: 6px 8px; background: #0d1117;
+    border: 1px solid #21262d; border-radius: 6px; margin-bottom: 5px;
+    cursor: pointer; font-size: 11px; }
+  .agent-row:hover { border-color: #58a6ff; background: #0f1422; }
+  .agent-row .av { width: 28px; height: 28px; background: #21262d;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .agent-row .name { font-weight: 600; }
+  .agent-row .sub { font-size: 9px; color: #7d8590; }
+  .agent-row .badge { font-size: 8px; padding: 2px 5px; border-radius: 7px; font-weight: 600; text-transform: lowercase; }
+  .badge.idle { background: rgba(125, 133, 144, 0.2); color: #7d8590; }
+  .badge.working { background: rgba(63, 185, 80, 0.2); color: #3fb950; }
+  .badge.walking { background: rgba(88, 166, 255, 0.2); color: #58a6ff; }
+  .badge.spawned { background: rgba(154, 103, 0, 0.2); color: #d29922; }
+
+  .log-list { flex: 1; overflow-y: auto; padding: 4px 16px 16px; }
+  .log-entry { font-size: 11px; padding: 6px 8px; margin-bottom: 4px;
+    border-left: 3px solid #21262d; background: rgba(255,255,255,0.02);
+    border-radius: 0 4px 4px 0; line-height: 1.4; }
+  .log-entry .time { color: #7d8590; font-size: 9px;
+    font-family: 'JetBrains Mono', monospace; margin-right: 4px; }
+  .log-entry.action { border-left-color: #58a6ff; }
+  .log-entry.success { border-left-color: #3fb950; }
+  .log-entry.spawn { border-left-color: #d29922; }
+  .log-entry .who { font-weight: 600; }
+  .log-entry .marker { display: inline-block; font-family: 'JetBrains Mono', monospace;
+    background: rgba(88, 166, 255, 0.15); color: #79c0ff;
+    padding: 1px 5px; border-radius: 3px; font-size: 9px; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .stat { text-align: center; padding: 6px; background: #0d1117;
+    border: 1px solid #21262d; border-radius: 6px; }
+  .stat .num { font-size: 16px; font-weight: 700; color: #79c0ff; }
+  .stat .lbl { font-size: 9px; color: #7d8590; }
+
+  /* ─── Terminal Drawer (en bas, click sur sprite) ─── */
+  .drawer {
+    position: fixed; left: 0; right: 360px; bottom: 0;
+    height: 320px; max-height: 50vh;
+    background: #0a0a0a;
+    border-top: 1px solid #30363d;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.6);
+    transform: translateY(100%);
+    transition: transform 0.3s ease-out;
+    display: flex; flex-direction: column;
+    z-index: 50;
+  }
+  .drawer.open { transform: translateY(0); }
+  .drawer-header {
+    padding: 8px 14px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px;
+  }
+  .drawer-title { font-weight: 600; }
+  .drawer-title .pid { font-family: 'JetBrains Mono', monospace; color: #7d8590; font-size: 11px; margin-left: 8px; }
+  .drawer-close { background: none; border: none; color: #7d8590; cursor: pointer; font-size: 18px; padding: 0 4px; }
+  .drawer-close:hover { color: #f85149; }
+
+  .terminal {
+    flex: 1; overflow-y: auto; padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: #c9d1d9; background: #010409; line-height: 1.5;
+  }
+  .terminal .line { white-space: pre-wrap; }
+  .terminal .line.system { color: #7d8590; font-style: italic; }
+  .terminal .line.stdout { color: #c9d1d9; }
+  .terminal .line.stderr { color: #f85149; }
+  .terminal .line.user-input { color: #79c0ff; }
+  .terminal .line.agent-msg { color: #7ee787; }
+  .terminal .prompt { color: #58a6ff; }
+
+  .drawer-input {
+    border-top: 1px solid #30363d;
+    background: #010409;
+    padding: 8px 14px;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .drawer-input .lead { color: #58a6ff; font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+  .drawer-input input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: #c9d1d9; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .drawer { right: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage-wrap">
+  <div class="stage-header">
+    <h1>🌍 Moranville Bridge — Pixel Office</h1>
+    <div class="live" id="live-time">LIVE</div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn primary" onclick="testSpawn('claude-1', 'Quick task')">+ Task → Ferdi</button>
+    <button class="ctrl-btn primary" onclick="testSpawn('claude-2', 'Quick task')">+ Task → Kasi</button>
+    <button class="ctrl-btn" onclick="testMessage('claude-1', 'claude-2')">▶ Ferdi → Kasi</button>
+    <button class="ctrl-btn" onclick="testMessage('claude-2', 'claude-1')">◀ Kasi → Ferdi</button>
+    <button class="ctrl-btn" onclick="resetDemo()">↺ Reset</button>
+  </div>
+
+  <div class="office">
+    <div class="room" id="room">
+      <div class="wall"></div>
+      <div class="painting p1"></div>
+      <div class="painting p3"></div>
+      <div class="painting p2"></div>
+
+      <!-- Zones orchestrators -->
+      <div class="zone-c1"></div>
+      <div class="zone-c2"></div>
+      <div class="zone-label c1">▼ FERDI — SERVER PAYLOAD</div>
+      <div class="zone-label c2">▼ KASI — ASSET MANAGER</div>
+      <div class="zone-label team1">▼ TEAM FERDI (10 desks)</div>
+      <div class="zone-label team2">▼ TEAM KASI (10 desks)</div>
+
+      <!-- Orchestrator desks -->
+      <img src="sprites/BOOKSHELF_BOOKSHELF.png" class="bookshelf-center" alt="bookshelf">
+      <img src="sprites/DESK_DESK_FRONT.png" class="desk-c1" alt="desk">
+      <img src="sprites/DESK_DESK_FRONT.png" class="desk-c2" alt="desk">
+      <img src="sprites/PC_PC_FRONT_ON_1.png" class="pc-c1" alt="pc">
+      <img src="sprites/PC_PC_FRONT_ON_1.png" class="pc-c2" alt="pc">
+
+      <!-- Team grids: 2 × (5×2) = 10 desks each -->
+      <div class="team-grid team-1" id="team-1-grid"></div>
+      <div class="team-grid team-2" id="team-2-grid"></div>
+
+      <img src="sprites/PLANT_PLANT.png" class="plant-l" alt="plant">
+      <img src="sprites/PLANT_PLANT.png" class="plant-r" alt="plant">
+
+      <div class="door"></div>
+    </div>
+  </div>
+</div>
+
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <h3>Orchestrators</h3>
+    <div id="agents-list"></div>
+  </div>
+
+  <div class="sidebar-section">
+    <h3>Stats</h3>
+    <div class="stats">
+      <div class="stat"><div class="num" id="stat-orch">2</div><div class="lbl">orchestrators</div></div>
+      <div class="stat"><div class="num" id="stat-subs">0</div><div class="lbl">sub-agents</div></div>
+      <div class="stat"><div class="num" id="stat-events" style="color:#3fb950">0</div><div class="lbl">events</div></div>
+    </div>
+  </div>
+
+  <div class="sidebar-section" style="border-bottom: none; padding-bottom: 4px;">
+    <h3>Activity log</h3>
+  </div>
+  <div class="log-list" id="log-list"></div>
+</aside>
+
+<!-- Terminal drawer -->
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <div class="drawer-title">
+      <span id="drawer-name">—</span>
+      <span class="pid" id="drawer-pid"></span>
+    </div>
+    <button class="drawer-close" onclick="closeDrawer()">×</button>
+  </div>
+  <div class="terminal" id="terminal"></div>
+  <div class="drawer-input">
+    <span class="lead">▸</span>
+    <input id="drawer-input" type="text" placeholder="Talk to this agent…" autocomplete="off">
+  </div>
+</div>
+
+<script>
+  const TILE = 36;
+  let agents = [];
+  let agentIdSeq = 0;
+  let eventCount = 0;
+  let selectedAgent = null;
+
+  // Positions (en tiles)
+  const POS = {
+    desk1Chair: { x: 2.7, y: 4.4 },
+    desk1Side:  { x: 4.5, y: 4.4 },
+    desk2Chair: { x: 20.3, y: 4.4 },
+    desk2Side:  { x: 18.5, y: 4.4 },
+    door:       { x: 11.5, y: 13 },
+  };
+
+  // Team desks positions (computed from grid layout)
+  const TEAM_DESKS = { team1: [], team2: [] };
+  function computeTeamDeskPositions() {
+    // Team 1: cols 1.5-6.5, rows 6-10 (5 cols × 2 rows of 36px desks with 0.5 gap)
+    const startX1 = 1.5, startX2 = 18.5;
+    const startY = 6;
+    const rowH = 2.5; // 2 tiles desk + 0.5 gap
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < 5; col++) {
+        const x = col * 1.5; // 1 tile + 0.5 gap
+        const y = startY + row * rowH;
+        TEAM_DESKS.team1.push({ x: startX1 + x, y, occupied: false });
+        TEAM_DESKS.team2.push({ x: startX2 + x, y, occupied: false });
+      }
+    }
+  }
+
+  function renderTeamGrids() {
+    for (const team of ['team-1', 'team-2']) {
+      const grid = document.getElementById(`${team}-grid`);
+      for (let i = 0; i < 10; i++) {
+        const desk = document.createElement('div');
+        desk.className = 'small-desk';
+        desk.dataset.idx = i;
+        desk.dataset.team = team;
+        const num = document.createElement('div');
+        num.className = 'small-desk-num';
+        num.textContent = (i + 1).toString().padStart(2, '0');
+        desk.appendChild(num);
+        grid.appendChild(desk);
+      }
+    }
+  }
+
+  function findFreeDesk(team) {
+    const desks = TEAM_DESKS[team];
+    for (const d of desks) {
+      if (!d.occupied) return d;
+    }
+    return null;
+  }
+
+  // ─── Sprite ───
+  function createSprite({ id, char, name, isOrchestrator, x, y, dir = 'down', state = 'idle', team = null }) {
+    const room = document.getElementById('room');
+    const sprite = document.createElement('div');
+    sprite.className = 'sprite' + (team ? ' ' + team : '');
+    sprite.dataset.char = char;
+    sprite.dataset.name = name;
+    sprite.dataset.dir = dir;
+    sprite.dataset.state = state;
+    sprite.dataset.orchestrator = String(!!isOrchestrator);
+    sprite.id = 'sp-' + id;
+    sprite.style.left = (x * TILE) + 'px';
+    sprite.style.top = (y * TILE) + 'px';
+    if (!isOrchestrator) sprite.classList.add('spawning');
+    const inner = document.createElement('div');
+    inner.className = 'sprite-inner';
+    sprite.appendChild(inner);
+    sprite.addEventListener('click', () => openAgent(id));
+    room.appendChild(sprite);
+    return sprite;
+  }
+
+  function setSpriteState(agent, dir, state) {
+    if (!agent.element) return;
+    if (dir) agent.element.dataset.dir = dir;
+    if (state) agent.element.dataset.state = state;
+  }
+
+  function moveTo(agent, target, durationMs) {
+    return new Promise(resolve => {
+      const sprite = agent.element;
+      const fromX = parseFloat(sprite.style.left);
+      const fromY = parseFloat(sprite.style.top);
+      const toX = target.x * TILE;
+      const toY = target.y * TILE;
+      const dx = toX - fromX, dy = toY - fromY;
+      let dir = 'down';
+      if (Math.abs(dx) > Math.abs(dy)) dir = dx > 0 ? 'right' : 'left';
+      else dir = dy > 0 ? 'down' : 'up';
+      sprite.dataset.flip = (dir === 'left') ? 'true' : 'false';
+      sprite.dataset.state = 'walking';
+      sprite.dataset.dir = dir;
+      sprite.style.transition = `left ${durationMs}ms linear, top ${durationMs}ms linear`;
+      sprite.style.left = toX + 'px';
+      sprite.style.top = toY + 'px';
+      agent.x = target.x; agent.y = target.y;
+      setTimeout(resolve, durationMs);
+    });
+  }
+
+  async function pathwalk(agent, waypoints, speedMsPerTile = 350) {
+    for (const wp of waypoints) {
+      const dx = Math.abs(wp.x - agent.x);
+      const dy = Math.abs(wp.y - agent.y);
+      const dist = Math.max(dx, dy);
+      await moveTo(agent, wp, Math.max(400, dist * speedMsPerTile));
+    }
+  }
+
+  // ─── Spawn (sub-agent only via orchestrator) ───
+  // Sub-agent name pool (random fun names if no custom name passed)
+  const NAMES = ['Atlas', 'Nova', 'Echo', 'Sage', 'Pixel', 'Rusty', 'Patch', 'Zorro', 'Scout', 'Ada', 'Linus', 'Riv', 'Bit', 'Kira', 'Mox'];
+
+  function spawnSubagent(parentId, role, externalEventId = null, customName = null) {
+    const parent = agents.find(a => a.id === parentId);
+    if (!parent || !parent.isOrchestrator) {
+      console.warn('Sub-agent must be spawned by an orchestrator');
+      return null;
+    }
+    const team = parentId === 'claude-1' ? 'team1' : 'team2';
+    const teamClass = parentId === 'claude-1' ? 'team-1' : 'team-2';
+    const desk = findFreeDesk(team);
+    if (!desk) {
+      addLog('error', parent.name, 'all team desks occupied', '[full]', '⚠️');
+      return null;
+    }
+    desk.occupied = true;
+
+    const charIdx = [1, 2, 4, 5][Math.floor(Math.random() * 4)];
+    const id = externalEventId ? 'ext-' + externalEventId : 'sub-' + (++agentIdSeq);
+    const shortName = customName || NAMES[Math.floor(Math.random() * NAMES.length)];
+
+    const element = createSprite({
+      id, char: charIdx, name: shortName,
+      isOrchestrator: false,
+      x: POS.door.x, y: POS.door.y,
+      dir: 'up', state: 'idle',
+      team: teamClass
+    });
+
+    const agent = {
+      id, parentId, role, char: charIdx,
+      isOrchestrator: false, team,
+      x: POS.door.x, y: POS.door.y,
+      status: 'spawned', element,
+      desk, terminalLog: [],
+      external: !!externalEventId,
+      agentEventId: externalEventId
+    };
+    agents.push(agent);
+    refreshSidebar();
+    addLog('spawn', parent.name, 'spawned', `[${role}]`, '🐣');
+    showBubble(parent.id, '⚡', 1200);
+    setTimeout(() => element.classList.remove('spawning'), 400);
+
+    // Add system log lines
+    pushTerminalLine(agent, 'system', `> Sub-agent spawned by ${parent.name}`);
+    pushTerminalLine(agent, 'system', `> Role: ${role}`);
+    pushTerminalLine(agent, 'system', `> Walking to desk ${team.replace('team','#')}-${(desk === TEAM_DESKS[team][0] ? 1 : TEAM_DESKS[team].indexOf(desk) + 1).toString().padStart(2, '0')}…`);
+
+    // Walk to assigned desk
+    setTimeout(async () => {
+      const inter = { x: desk.x, y: desk.y - 1 };
+      await pathwalk(agent, [inter, desk]);
+      if (agent.element && agent.element.parentNode) {
+        setSpriteState(agent, 'up', 'typing');
+        agent.status = 'working';
+        refreshSidebar();
+        // Mark desk visually occupied
+        const grid = document.getElementById(`${teamClass}-grid`);
+        const idx = TEAM_DESKS[team].indexOf(desk);
+        if (grid && grid.children[idx]) grid.children[idx].dataset.occupied = 'true';
+        pushTerminalLine(agent, 'system', `> Arrived at desk. Working…`);
+      }
+      // For non-external, auto-leave after timer
+      if (!agent.external) {
+        const dwell = 8000 + Math.random() * 5000;
+        setTimeout(() => leaveAgent(agent), dwell);
+      }
+    }, 600);
+
+    return agent;
+  }
+
+  async function leaveAgent(agent) {
+    if (!agent.element) return;
+    pushTerminalLine(agent, 'system', '> Task done. Leaving…');
+    const teamClass = agent.parentId === 'claude-1' ? 'team-1' : 'team-2';
+    const grid = document.getElementById(`${teamClass}-grid`);
+    const idx = TEAM_DESKS[agent.team].indexOf(agent.desk);
+    if (grid && grid.children[idx]) delete grid.children[idx].dataset.occupied;
+
+    await pathwalk(agent, [{ x: agent.x, y: 12 }, POS.door]);
+    if (agent.element) agent.element.classList.add('leaving');
+    addLog('success', agent.role, 'finished', `[done]`, '✓');
+    setTimeout(() => {
+      if (agent.element) agent.element.remove();
+      agent.desk.occupied = false;
+      agents = agents.filter(a => a.id !== agent.id);
+      refreshSidebar();
+      if (selectedAgent && selectedAgent.id === agent.id) closeDrawer();
+    }, 400);
+  }
+
+  // ─── External events ──────────
+  let processedEventIds = new Set();
+  let externalSubagents = new Map();
+
+  async function pollExternalEvents() {
+    try {
+      const res = await fetch('events.json?t=' + Date.now());
+      if (!res.ok) return;
+      const data = await res.json();
+      for (const ev of data.events || []) {
+        if (processedEventIds.has(ev.id)) continue;
+        processedEventIds.add(ev.id);
+        handleExternalEvent(ev);
+      }
+    } catch (e) {}
+  }
+
+  function handleExternalEvent(ev) {
+    if (ev.type === 'spawn') {
+      spawnSubagent(ev.parent, ev.role, ev.agentEventId, ev.name || null);
+      const agent = agents.find(a => a.agentEventId === ev.agentEventId);
+      if (agent) externalSubagents.set(ev.agentEventId, agent);
+    } else if (ev.type === 'log' || ev.type === 'msg') {
+      const agent = externalSubagents.get(ev.agentEventId);
+      if (agent) {
+        pushTerminalLine(agent, ev.type === 'msg' ? 'agent-msg' : 'stdout', ev.line);
+      }
+    } else if (ev.type === 'done') {
+      const agent = externalSubagents.get(ev.agentEventId);
+      if (agent) {
+        pushTerminalLine(agent, 'system', `> ${ev.summary || 'done'}`);
+        leaveAgent(agent);
+        externalSubagents.delete(ev.agentEventId);
+      }
+    }
+  }
+  setInterval(pollExternalEvents, 1500);
+
+  // ─── Test buttons ──────────
+  function testSpawn(parentId, role) {
+    const sub = spawnSubagent(parentId, role);
+    if (sub) {
+      // Simulate some terminal output
+      const lines = [
+        '$ analyzing context…',
+        '✓ context loaded (12 files)',
+        `→ task: ${role}`,
+        '$ running…',
+        '✓ done',
+      ];
+      lines.forEach((l, i) => setTimeout(() => pushTerminalLine(sub, 'stdout', l), 1000 + i * 1500));
+    }
+  }
+
+  async function testMessage(fromId, toId) {
+    const from = agents.find(a => a.id === fromId);
+    const to = agents.find(a => a.id === toId);
+    if (!from || !to) return;
+    showBubble(fromId, '!', 1500);
+    addLog('action', from.name, 'sent message to', `[${to.name}]`, '✉️');
+    setTimeout(() => {
+      showBubble(toId, '?', 1500);
+      addLog('action', to.name, 'received message', `[from ${from.name}]`, '📨');
+      setTimeout(() => spawnSubagent(toId, 'message handler'), 800);
+    }, 800);
+  }
+
+  // ─── Setup orchestrators ────────
+  function setupOrchestrators() {
+    const c1 = {
+      id: 'claude-1', parentId: null, role: 'Server Payload Moranville',
+      name: 'Ferdi', char: 0, isOrchestrator: true,
+      x: POS.desk1Chair.x, y: POS.desk1Chair.y,
+      status: 'working', terminalLog: [],
+      element: createSprite({
+        id: 'claude-1', char: 0, name: 'Ferdi',
+        isOrchestrator: true, x: POS.desk1Chair.x, y: POS.desk1Chair.y,
+        dir: 'up', state: 'typing'
+      })
+    };
+    const c2 = {
+      id: 'claude-2', parentId: null, role: 'Asset Manager Rust',
+      name: 'Kasi', char: 3, isOrchestrator: true,
+      x: POS.desk2Chair.x, y: POS.desk2Chair.y,
+      status: 'working', terminalLog: [],
+      element: createSprite({
+        id: 'claude-2', char: 3, name: 'Kasi',
+        isOrchestrator: true, x: POS.desk2Chair.x, y: POS.desk2Chair.y,
+        dir: 'up', state: 'typing'
+      })
+    };
+    agents.push(c1, c2);
+    pushTerminalLine(c1, 'system', '> Ferdi (orchestrator) — Server Payload Moranville');
+    pushTerminalLine(c1, 'system', '> Workspace: ~/Documents/CONSULT/Moranville/moranville-b2c-repo');
+    pushTerminalLine(c1, 'system', '> Status: ready. Listening for tasks.');
+    pushTerminalLine(c2, 'system', '> Kasi (orchestrator) — Asset Manager Rust');
+    pushTerminalLine(c2, 'system', '> Workspace: C:\\Users\\casim\\Desktop\\Dashboard Plateforme e-commerce\\');
+    pushTerminalLine(c2, 'system', '> Status: ready. Listening for tasks.');
+    refreshSidebar();
+  }
+
+  // ─── Sidebar ─────────────
+  function refreshSidebar() {
+    const list = document.getElementById('agents-list');
+    list.innerHTML = '';
+    const orchs = agents.filter(a => a.isOrchestrator);
+    const subs = agents.filter(a => !a.isOrchestrator);
+
+    orchs.forEach(a => {
+      const row = document.createElement('div');
+      row.className = 'agent-row';
+      row.innerHTML = `
+        <div class="av">${a.id === 'claude-1' ? '🧙' : '👩‍💻'}</div>
+        <div>
+          <div class="name">${a.name}</div>
+          <div class="sub">${a.role}</div>
+        </div>
+        <span class="badge ${a.status}">${a.status}</span>`;
+      row.onclick = () => openAgent(a.id);
+      list.appendChild(row);
+
+      const myChildren = subs.filter(s => s.parentId === a.id);
+      if (myChildren.length) {
+        const cont = document.createElement('div');
+        cont.style.marginLeft = '12px'; cont.style.marginTop = '3px';
+        myChildren.forEach(s => {
+          const sub = document.createElement('div');
+          sub.className = 'agent-row';
+          sub.style.padding = '4px 7px';
+          sub.style.fontSize = '10px';
+          sub.innerHTML = `
+            <div class="av" style="width:22px;height:22px;font-size:11px;">↳</div>
+            <div>
+              <div class="name" style="font-size:10px;">${s.role}</div>
+              <div class="sub" style="font-size:8px;">${s.id.replace(/^(sub|ext)-/, '')}</div>
+            </div>
+            <span class="badge spawned">${s.status}</span>`;
+          sub.onclick = () => openAgent(s.id);
+          cont.appendChild(sub);
+        });
+        list.appendChild(cont);
+      }
+    });
+
+    document.getElementById('stat-subs').textContent = subs.length;
+
+    // Update orchestrator sub-count badges
+    for (const orchId of ['claude-1', 'claude-2']) {
+      const orch = agents.find(a => a.id === orchId);
+      if (!orch || !orch.element) continue;
+      const count = subs.filter(s => s.parentId === orchId).length;
+      if (count > 0) orch.element.dataset.subCount = count;
+      else delete orch.element.dataset.subCount;
+    }
+  }
+
+  // ─── Typing indicator ───
+  function showTypingIndicator(agent) {
+    if (!selectedAgent || selectedAgent.id !== agent.id) return;
+    hideTypingIndicator(agent);
+    const term = document.getElementById('terminal');
+    const div = document.createElement('div');
+    div.className = 'line typing-indicator';
+    div.id = 'typing-' + agent.id;
+    div.innerHTML = '<span class="dots">awaiting reply</span>';
+    term.appendChild(div);
+    term.scrollTop = term.scrollHeight;
+    agent._typingEl = div;
+  }
+  function hideTypingIndicator(agent) {
+    if (agent._typingEl && agent._typingEl.parentNode) {
+      agent._typingEl.remove();
+    }
+    delete agent._typingEl;
+    const stale = document.getElementById('typing-' + agent.id);
+    if (stale) stale.remove();
+  }
+
+  // ─── Drawer terminal ───────
+  function openAgent(id) {
+    const a = agents.find(x => x.id === id);
+    if (!a) return;
+    selectedAgent = a;
+    document.querySelectorAll('.sprite').forEach(s => s.classList.remove('selected'));
+    if (a.element) a.element.classList.add('selected');
+
+    document.getElementById('drawer-name').textContent = a.name || a.role;
+    document.getElementById('drawer-pid').textContent = `[${a.isOrchestrator ? 'orchestrator' : 'sub-agent'} · ${a.id}]`;
+    renderTerminal(a);
+    document.getElementById('drawer').classList.add('open');
+    document.getElementById('drawer-input').focus();
+  }
+
+  function closeDrawer() {
+    document.getElementById('drawer').classList.remove('open');
+    document.querySelectorAll('.sprite').forEach(s => s.classList.remove('selected'));
+    selectedAgent = null;
+  }
+
+  function renderTerminal(agent) {
+    const term = document.getElementById('terminal');
+    term.innerHTML = '';
+    for (const line of agent.terminalLog) {
+      const div = document.createElement('div');
+      div.className = 'line ' + (line.kind || 'stdout');
+      const ts = line.ts ? `<span style="color:#7d8590">[${line.ts}]</span> ` : '';
+      div.innerHTML = ts + line.text;
+      term.appendChild(div);
+    }
+    term.scrollTop = term.scrollHeight;
+  }
+
+  function pushTerminalLine(agent, kind, text) {
+    const ts = new Date().toTimeString().slice(0, 8);
+    agent.terminalLog.push({ kind, text, ts });
+    if (agent.terminalLog.length > 200) agent.terminalLog = agent.terminalLog.slice(-200);
+    if (selectedAgent && selectedAgent.id === agent.id) {
+      const term = document.getElementById('terminal');
+      const div = document.createElement('div');
+      div.className = 'line ' + kind;
+      div.innerHTML = `<span style="color:#7d8590">[${ts}]</span> ${text}`;
+      term.appendChild(div);
+      term.scrollTop = term.scrollHeight;
+    }
+  }
+
+  // Input — POST to /chat (real backend file)
+  async function sendChat(agentId, message) {
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ agent: agentId, message })
+      });
+      return await res.json();
+    } catch (e) {
+      return {ok: false, error: String(e)};
+    }
+  }
+
+  document.getElementById('drawer-input').addEventListener('keydown', async e => {
+    if (e.key === 'Enter' && selectedAgent) {
+      const val = e.target.value.trim();
+      if (!val) return;
+      pushTerminalLine(selectedAgent, 'user-input', '▸ ' + val);
+      e.target.value = '';
+      // Send to backend (file persisted at chats/<agent>.jsonl)
+      const result = await sendChat(selectedAgent.id, val);
+      if (!result.ok) {
+        pushTerminalLine(selectedAgent, 'stderr', `[error] ${result.error || 'send failed'}`);
+        return;
+      }
+      // Indicator that it's been queued
+      const target = selectedAgent.id === 'claude-1' ? 'Ferdi (this Claude session)' :
+                     selectedAgent.id === 'claude-2' ? 'Kasi (Casimir Claude)' :
+                     selectedAgent.role;
+      pushTerminalLine(selectedAgent, 'system', `[queued for ${target}]`);
+      showTypingIndicator(selectedAgent);
+    }
+    if (e.key === 'Escape') closeDrawer();
+  });
+
+  // Render incoming user-msg / agent-msg events onto the right agent's terminal
+  // (already partially handled in handleExternalEvent, but here we also catch
+  // direct routing where agentEventId == 'claude-1' or 'claude-2')
+  function routeChatEvent(ev) {
+    let agent = null;
+    if (ev.agentEventId === 'claude-1' || ev.agentEventId === 'claude-2') {
+      agent = agents.find(a => a.id === ev.agentEventId);
+    } else {
+      agent = externalSubagents.get(ev.agentEventId);
+    }
+    if (!agent) return false;
+    if (ev.type === 'user-msg') {
+      // already rendered locally by sendChat → don't double print
+      return true;
+    } else if (ev.type === 'log') {
+      pushTerminalLine(agent, 'stdout', ev.line);
+      return true;
+    } else if (ev.type === 'msg') {
+      hideTypingIndicator(agent);
+      pushTerminalLine(agent, 'agent-msg', ev.line);
+      return true;
+    }
+    return false;
+  }
+
+  // Patch handleExternalEvent to route chat events too
+  const _orig_handleExternalEvent = handleExternalEvent;
+  handleExternalEvent = function(ev) {
+    if (ev.type === 'user-msg' || (ev.agentEventId === 'claude-1' || ev.agentEventId === 'claude-2')) {
+      if (routeChatEvent(ev)) return;
+    }
+    _orig_handleExternalEvent(ev);
+  };
+
+  // ─── Bubbles ──────────
+  function showBubble(agentId, text, durationMs = 2000) {
+    const agent = agents.find(a => a.id === agentId);
+    if (!agent) return;
+    const room = document.getElementById('room');
+    const b = document.createElement('div');
+    b.className = 'bubble';
+    b.textContent = text;
+    b.style.left = (agent.x * TILE + TILE / 2) + 'px';
+    b.style.top = (agent.y * TILE) + 'px';
+    room.appendChild(b);
+    setTimeout(() => b.remove(), durationMs);
+  }
+
+  // ─── Activity log ───
+  function addLog(kind, who, verb, marker, icon = '') {
+    const log = document.getElementById('log-list');
+    const e = document.createElement('div');
+    e.className = 'log-entry ' + kind;
+    const t = new Date().toTimeString().slice(0, 8);
+    e.innerHTML = `<span class="time">${t}</span> ${icon} <span class="who">${who}</span> ${verb} <span class="marker">${marker}</span>`;
+    log.insertBefore(e, log.firstChild);
+    while (log.children.length > 30) log.removeChild(log.lastChild);
+    eventCount++;
+    document.getElementById('stat-events').textContent = eventCount;
+  }
+
+  // ─── Reset ────
+  function resetDemo() {
+    document.querySelectorAll('.sprite').forEach(s => s.remove());
+    agents = []; agentIdSeq = 0; eventCount = 0;
+    document.getElementById('stat-events').textContent = '0';
+    document.getElementById('log-list').innerHTML = '';
+    TEAM_DESKS.team1.forEach(d => d.occupied = false);
+    TEAM_DESKS.team2.forEach(d => d.occupied = false);
+    document.querySelectorAll('.small-desk').forEach(d => delete d.dataset.occupied);
+    closeDrawer();
+    setupOrchestrators();
+    addLog('action', 'system', 'demo reset', '[init]', '↺');
+  }
+
+  setInterval(() => {
+    const t = new Date().toTimeString().slice(0, 8);
+    document.getElementById('live-time').textContent = 'LIVE · ' + t;
+  }, 1000);
+
+  // Boot
+  computeTeamDeskPositions();
+  renderTeamGrids();
+  setupOrchestrators();
+  addLog('action', 'system', 'office initialized', '[boot]', '🌍');
+</script>
+
+</body>
+</html>

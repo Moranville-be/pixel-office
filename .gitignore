@@ -1,0 +1,7 @@
+# Runtime state — not versioned
+events.json
+chats/
+.ack-seen/
+*.log
+__pycache__/
+.DS_Store
