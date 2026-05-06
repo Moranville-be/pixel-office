@@ -1,96 +1,68 @@
-# install-casimir.ps1 — one-shot installer for the Casimir-side pixel-office.
-# Run this once on Windows. It will:
-#   1. Clone (or pull) Moranville-be/pixel-office and Moranville-be/bridge
-#   2. Create a desktop shortcut "Moranville Pixel Office.lnk"
-#   3. Launch the pixel-office for the first time (port 8888 by default)
-#
-# Usage:
-#   PowerShell> .\install-casimir.ps1
-#
-# Environment overrides:
-#   $env:PIXEL_OFFICE_DIR  → install root (default: $HOME\.moranville-pixel-office)
-#   $env:BRIDGE_DIR        → bridge clone  (default: $HOME\.moranville-bridge)
-#   $env:PIXEL_OFFICE_PORT → port (default: 8888)
-
+# install-casimir.ps1 — one-shot installer (Casimir side)
+# Usage: .\install-casimir.ps1 [-WsToken <token>]
+param(
+    [string]$WsToken = $env:PIXEL_OFFICE_WS_TOKEN,
+    [string]$WsUrl = "wss://pixel.ferdi.wtf/ws",
+    [int]$Port = 8888
+)
 $ErrorActionPreference = "Stop"
 
-# ─── Paths ───
-$pixelOffice = if ($env:PIXEL_OFFICE_DIR) { $env:PIXEL_OFFICE_DIR } else { Join-Path $HOME ".moranville-pixel-office" }
-$bridge      = if ($env:BRIDGE_DIR)        { $env:BRIDGE_DIR }        else { Join-Path $HOME ".moranville-bridge" }
-$port        = if ($env:PIXEL_OFFICE_PORT) { $env:PIXEL_OFFICE_PORT } else { "8888" }
+$pixelOffice = Join-Path $HOME ".moranville-pixel-office"
+$bridge = Join-Path $HOME ".moranville-bridge"
 
-Write-Host "🌍 Moranville Pixel Office — Casimir side installer" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "  pixel-office: $pixelOffice"
-Write-Host "  bridge:       $bridge"
-Write-Host "  port:         $port"
+Write-Host "🌍 Moranville Pixel Office — Casimir installer" -ForegroundColor Cyan
+Write-Host "  pixel-office:  $pixelOffice"
+Write-Host "  bridge:        $bridge"
+Write-Host "  WS hub:        $WsUrl"
 Write-Host ""
 
-# ─── Clone or pull ───
+if (-not $WsToken) {
+    Write-Host "⚠ Pas de token WS fourni." -ForegroundColor Yellow
+    Write-Host "  Demande à Ferdi de te le passer (Signal/vocal — JAMAIS par mail/Git)."
+    Write-Host "  Ensuite relance: .\install-casimir.ps1 -WsToken <token>"
+    Write-Host "  Ou définis: `$env:PIXEL_OFFICE_WS_TOKEN = '<token>'"
+    Write-Host "  Tu peux continuer sans token: l'app marche en local-only, sans live cross-machine."
+    Write-Host ""
+}
+
+# Clone / pull
 if (-not (Test-Path $pixelOffice)) {
-    Write-Host "→ Cloning Moranville-be/pixel-office..." -ForegroundColor Yellow
     git clone https://github.com/Moranville-be/pixel-office.git $pixelOffice
 } else {
-    Write-Host "→ Pulling pixel-office latest..." -ForegroundColor Yellow
-    Push-Location $pixelOffice
-    git pull --rebase --autostash 2>$null
-    Pop-Location
+    Push-Location $pixelOffice; git pull --rebase --autostash 2>$null; Pop-Location
 }
-
 if (-not (Test-Path $bridge)) {
-    Write-Host "→ Cloning Moranville-be/bridge..." -ForegroundColor Yellow
     git clone https://github.com/Moranville-be/bridge.git $bridge
 } else {
-    Write-Host "→ Pulling bridge latest..." -ForegroundColor Yellow
-    Push-Location $bridge
-    git pull --rebase --autostash 2>$null
-    Pop-Location
+    Push-Location $bridge; git pull --rebase --autostash 2>$null; Pop-Location
 }
 
-# ─── Create desktop shortcut ───
-$shortcutPath = Join-Path $HOME "Desktop\Moranville Pixel Office.lnk"
-$launcherScript = Join-Path $pixelOffice "launch-casimir.ps1"
-
-# Generate the launcher script (sets env vars then calls start.ps1)
+# Generate launcher script
 $launcher = @"
-# Auto-generated launcher for Moranville Pixel Office (Casimir side)
+# Auto-generated launcher — Moranville Pixel Office (Casimir)
 `$env:PIXEL_OFFICE_WHO = "casimir"
 `$env:PIXEL_OFFICE_BRIDGE = "$bridge"
-`$env:PIXEL_OFFICE_PORT = "$port"
+`$env:PIXEL_OFFICE_PORT = "$Port"
+`$env:PIXEL_OFFICE_WS_URL = "$WsUrl"
+`$env:PIXEL_OFFICE_WS_TOKEN = "$WsToken"
 & "$pixelOffice\start.ps1"
-Write-Host ""
-Write-Host "Pixel Office is live on http://localhost:$port"
-Write-Host "Close this window to keep server running."
-Write-Host "Press Enter to exit (server keeps running)..."
-Read-Host
 "@
-Set-Content -Path $launcherScript -Value $launcher -Encoding UTF8
+$launcherPath = Join-Path $pixelOffice "launch-casimir.ps1"
+Set-Content -Path $launcherPath -Value $launcher -Encoding UTF8
 
-# Build .lnk
+# Desktop shortcut
+$shortcutPath = Join-Path $HOME "Desktop\Moranville Pixel Office.lnk"
 $WshShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut($shortcutPath)
 $Shortcut.TargetPath = "powershell.exe"
-$Shortcut.Arguments = "-NoExit -ExecutionPolicy Bypass -File `"$launcherScript`""
-$Shortcut.IconLocation = "imageres.dll,76"  # Globe icon
+$Shortcut.Arguments = "-NoExit -ExecutionPolicy Bypass -File `"$launcherPath`""
+$Shortcut.IconLocation = "imageres.dll,76"
 $Shortcut.WorkingDirectory = $pixelOffice
-$Shortcut.Description = "Moranville Pixel Office — Casimir side (sync via bridge)"
+$Shortcut.Description = "Moranville Pixel Office (Casimir side)"
 $Shortcut.Save()
-Write-Host "✅ Desktop shortcut created: $shortcutPath" -ForegroundColor Green
+Write-Host "✅ Desktop shortcut: $shortcutPath" -ForegroundColor Green
 
-# ─── Launch first time ───
+# First launch
 Write-Host ""
-Write-Host "→ Launching pixel-office for the first time..." -ForegroundColor Yellow
-$env:PIXEL_OFFICE_WHO = "casimir"
-$env:PIXEL_OFFICE_BRIDGE = $bridge
-$env:PIXEL_OFFICE_PORT = $port
-& "$pixelOffice\start.ps1"
-
-Write-Host ""
-Write-Host "═══════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "✅ Install done. Double-click 'Moranville Pixel Office' on your Desktop"
-Write-Host "   any time you want to (re)start the dashboard."
-Write-Host ""
-Write-Host "   Dashboard URL:  http://localhost:$port"
-Write-Host "   Bridge clone:   $bridge"
-Write-Host "   Pixel-office:   $pixelOffice"
-Write-Host "═══════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "→ Launching for first run..." -ForegroundColor Yellow
+& $launcherPath

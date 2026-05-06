@@ -698,6 +698,57 @@
   }
   setInterval(pollExternalEvents, 1500);
 
+  // ─── WebSocket live channel (Jarvis hub) ───────────
+  let ws = null;
+  let wsConfig = null;
+  async function bootWebSocket() {
+    try {
+      const res = await fetch('/api/config.json');
+      const cfg = await res.json();
+      wsConfig = cfg;
+      if (!cfg.ws_token) {
+        addLog('error', 'system', 'no WS token (PIXEL_OFFICE_WS_TOKEN unset)', '[no-ws]', '⚠️');
+        return;
+      }
+      // Browser WebSocket API doesn't support custom headers, so we pass token as subprotocol
+      // The hub accepts both Authorization header (server-side clients) and subprotocol (browser)
+      const url = cfg.ws_url + (cfg.ws_url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(cfg.ws_token);
+      ws = new WebSocket(url);
+      ws.onopen = () => {
+        addLog('success', 'system', 'WebSocket connected', `[${cfg.ws_url}]`, '🔌');
+        ws.send(JSON.stringify({type: 'hello', who: cfg.who}));
+      };
+      ws.onmessage = (msg) => handleWsMessage(msg.data);
+      ws.onclose = () => {
+        addLog('error', 'system', 'WebSocket disconnected — retry in 5s', '', '⚠️');
+        setTimeout(bootWebSocket, 5000);
+      };
+      ws.onerror = (e) => console.warn('ws error', e);
+    } catch (e) {
+      console.warn('ws boot error', e);
+    }
+  }
+  function wsBroadcast(payload) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try { ws.send(JSON.stringify(payload)); } catch (e) {}
+    }
+  }
+  function handleWsMessage(raw) {
+    try {
+      const ev = JSON.parse(raw);
+      if (ev.type === 'presence') {
+        addLog('action', ev.who, ev.event === 'joined' ? 'is now online' : 'has left', '[ws-presence]', ev.event === 'joined' ? '🟢' : '⚪');
+        return;
+      }
+      // Forward as if it were an external event
+      if (!processedEventIds.has(ev.id)) {
+        processedEventIds.add(ev.id);
+        handleExternalEvent(ev);
+      }
+    } catch (e) {}
+  }
+  setTimeout(bootWebSocket, 500);
+
   // ─── Presence (heartbeat-based) ───────────
   async function pollPresence() {
     try {

@@ -16,6 +16,10 @@ PORT = int(os.environ.get('PIXEL_OFFICE_PORT', 8888))
 WHO = os.environ.get('PIXEL_OFFICE_WHO', 'ferdi').strip().lower()
 BRIDGE = os.environ.get('PIXEL_OFFICE_BRIDGE', '')
 
+# WebSocket hub (Jarvis-hosted, shared between Ferdi + Casimir)
+WS_URL = os.environ.get('PIXEL_OFFICE_WS_URL', 'wss://pixel.ferdi.wtf/ws')
+WS_TOKEN = os.environ.get('PIXEL_OFFICE_WS_TOKEN', '')
+
 
 def parse_iso_utc(ts):
     """Parse 'YYYY-MM-DDTHH:MM:SSZ' as UTC seconds since epoch."""
@@ -106,6 +110,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(payload.encode('utf-8'))
             return
+        # /api/config.json — frontend bootstrap (WS endpoint, identity, token)
+        if self.path.startswith('/api/config.json'):
+            payload = json.dumps({
+                'who': WHO,
+                'ws_url': WS_URL,
+                'ws_token': WS_TOKEN,  # exposed to localhost frontend only
+            })
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(payload.encode('utf-8'))
+            return
         # /api/state.json — orchestrator presence (event-based, no heartbeat file)
         if self.path.startswith('/api/state.json'):
             payload = json.dumps({
@@ -153,13 +170,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         }
         append_chat(agent, line)
         # Also append a "user-msg" event so the drawer can render in real time
-        append_event({
+        ev = {
             'id': str(uuid.uuid4()),
             'ts': ts,
             'type': 'user-msg',
             'agentEventId': agent,  # use agent id directly as the routing key
             'line': message,
-        })
+            'source': WHO,
+            'sandbox_scope': 'moranville-bridge',  # policy hint for the receiving Claude
+        }
+        append_event(ev)
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
