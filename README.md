@@ -122,11 +122,58 @@ Character / furniture sprites are licensed under MIT, sourced from
 [`pablodelucca/pixel-agents`](https://github.com/pablodelucca/pixel-agents)
 (itself derived from JIK-A-4's [Metro City pack](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack)).
 
+## Cross-machine sync (via bridge GitHub) — ✅ shipped
+
+Set `PIXEL_OFFICE_BRIDGE` to a local clone of
+[Moranville-be/bridge](https://github.com/Moranville-be/bridge) and `start.sh`
+will launch `sync.py` in the background:
+
+```bash
+git clone https://github.com/Moranville-be/bridge.git ~/.moranville-bridge
+PIXEL_OFFICE_WHO=ferdi PIXEL_OFFICE_BRIDGE=~/.moranville-bridge ./start.sh
+```
+
+What it does, every 8 seconds:
+
+1. **Push** new local events to `bridge/pixel-events/<who>.jsonl` (append-only),
+   refresh `bridge/pixel-events/<who>.heartbeat` (throttled to 1/min), commit + push.
+2. **Pull** `git pull --rebase`, merge `bridge/pixel-events/<other>.jsonl` into
+   local `events.json` (deduplicated by event id, marked with `source: <other>`).
+
+The frontend's `/api/state.json` exposes orchestrator presence based on
+heartbeat freshness:
+
+- `working` — heartbeat <120s ago + recent event <60s ago
+- `online-idle` — heartbeat <120s ago, no recent event
+- `offline` — heartbeat absent or >120s old
+
+Both sides see the same office, both sets of sub-agents.
+
+## Desktop shortcut (macOS)
+
+A `.command` file you can place on your Desktop:
+
+```bash
+#!/usr/bin/env bash
+PIXEL_OFFICE="$HOME/.moranville-pixel-office"
+BRIDGE="$HOME/.moranville-bridge"
+[ -d "$PIXEL_OFFICE" ] || git clone https://github.com/Moranville-be/pixel-office.git "$PIXEL_OFFICE"
+[ -d "$BRIDGE" ]       || git clone https://github.com/Moranville-be/bridge.git "$BRIDGE"
+( cd "$PIXEL_OFFICE" && git pull --rebase --autostash )
+( cd "$BRIDGE" && git pull --rebase --autostash )
+PIXEL_OFFICE_WHO=ferdi PIXEL_OFFICE_BRIDGE="$BRIDGE" bash "$PIXEL_OFFICE/start.sh"
+```
+
+Save as `~/Desktop/Moranville Pixel Office.command`, `chmod +x` it, then
+double-click. First run clones the repos automatically; subsequent runs pull
+the latest and start the server.
+
+For **Casimir on Windows**, the equivalent `.lnk` shortcut points to a wrapper
+that runs `start.ps1` with `$env:PIXEL_OFFICE_WHO = "casimir"`.
+
 ## Roadmap
 
-- [ ] **Cross-machine sync via the Moranville-be/bridge** — push local events to
-      `bridge/pixel-events/<who>.jsonl`, pull from the other side. Lets Ferdi
-      and Casimir see the same office, both side's sub-agents in one view.
+- [x] Cross-machine sync via Moranville-be/bridge
 - [ ] **Real-time chat → orchestrator** via Server-Sent Events (replace polling)
 - [ ] **Search** in the terminal drawer (Cmd/Ctrl+F)
 - [ ] **Persistent state** between server restarts

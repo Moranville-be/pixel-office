@@ -2,6 +2,7 @@
 events.json
 chats/
 .ack-seen/
+.sync-last-*.txt
 *.log
 __pycache__/
 .DS_Store

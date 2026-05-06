@@ -282,6 +282,7 @@
   .badge.working { background: rgba(63, 185, 80, 0.2); color: #3fb950; }
   .badge.walking { background: rgba(88, 166, 255, 0.2); color: #58a6ff; }
   .badge.spawned { background: rgba(154, 103, 0, 0.2); color: #d29922; }
+  .badge.offline { background: rgba(248, 81, 73, 0.2); color: #f85149; }
 
   .log-list { flex: 1; overflow-y: auto; padding: 4px 16px 16px; }
   .log-entry { font-size: 11px; padding: 6px 8px; margin-bottom: 4px;
@@ -696,6 +697,41 @@
     }
   }
   setInterval(pollExternalEvents, 1500);
+
+  // ─── Presence (heartbeat-based) ───────────
+  async function pollPresence() {
+    try {
+      const res = await fetch('/api/state.json?t=' + Date.now());
+      if (!res.ok) return;
+      const state = await res.json();
+      if (!state || !state.agents) return;
+      const map = { ferdi: 'claude-1', casimir: 'claude-2' };
+      for (const who of ['ferdi', 'casimir']) {
+        const agent = agents.find(a => a.id === map[who]);
+        if (!agent || !agent.element) continue;
+        const presence = state.agents[who]?.status || 'offline';
+        if (presence === 'offline') {
+          agent.element.dataset.state = 'idle';
+          agent.element.style.opacity = '0.35';
+          agent.element.style.filter = 'grayscale(1)';
+          agent.status = 'offline';
+        } else if (presence === 'online-idle') {
+          agent.element.dataset.state = 'idle';
+          agent.element.style.opacity = '1';
+          agent.element.style.filter = 'none';
+          agent.status = 'idle';
+        } else if (presence === 'working') {
+          agent.element.dataset.state = 'typing';
+          agent.element.style.opacity = '1';
+          agent.element.style.filter = 'none';
+          agent.status = 'working';
+        }
+      }
+      refreshSidebar();
+    } catch (e) {}
+  }
+  setInterval(pollPresence, 5000);
+  setTimeout(pollPresence, 1200);
 
   // ─── Test buttons ──────────
   function testSpawn(parentId, role) {

@@ -13,6 +13,60 @@ ROOT = os.environ.get('PIXEL_OFFICE_ROOT', os.path.dirname(os.path.abspath(__fil
 CHATS = os.path.join(ROOT, 'chats')
 EVENTS = os.path.join(ROOT, 'events.json')
 PORT = int(os.environ.get('PIXEL_OFFICE_PORT', 8888))
+WHO = os.environ.get('PIXEL_OFFICE_WHO', 'ferdi').strip().lower()
+BRIDGE = os.environ.get('PIXEL_OFFICE_BRIDGE', '')
+
+
+def heartbeat_path(who):
+    if not BRIDGE: return None
+    return os.path.join(BRIDGE, 'pixel-events', f'{who}.heartbeat')
+
+
+def read_heartbeat(who):
+    """Returns ISO timestamp string or None if not present / stale."""
+    p = heartbeat_path(who)
+    if not p or not os.path.exists(p):
+        return None
+    try:
+        return open(p).read().strip()
+    except Exception:
+        return None
+
+
+def parse_iso_utc(ts):
+    """Parse 'YYYY-MM-DDTHH:MM:SSZ' as UTC seconds since epoch."""
+    import calendar
+    return calendar.timegm(time.strptime(ts, '%Y-%m-%dT%H:%M:%SZ'))
+
+
+def status_for(who):
+    """offline | online-idle | working — based on heartbeat + recent events."""
+    hb = read_heartbeat(who)
+    if not hb:
+        return 'offline'
+    try:
+        hb_secs = parse_iso_utc(hb)
+    except Exception:
+        return 'offline'
+    age = time.time() - hb_secs
+    if age > 120:
+        return 'offline'
+    # Check recent events from this side
+    try:
+        data = json.load(open(EVENTS))
+        recent = [e for e in data.get('events', [])
+                  if e.get('source', WHO) == who]
+        if recent:
+            last = recent[-1].get('ts', '')
+            try:
+                last_age = time.time() - parse_iso_utc(last)
+                if last_age < 60:
+                    return 'working'
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return 'online-idle'
 
 os.makedirs(CHATS, exist_ok=True)
 if not os.path.exists(EVENTS):
@@ -56,6 +110,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             agent_id = self.path[len('/chats/'):-len('.json')]
             agent_id = urllib.parse.unquote(agent_id).split('?')[0]
             payload = json.dumps({'agent': agent_id, 'lines': read_chat(agent_id)})
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(payload.encode('utf-8'))
+            return
+        # /api/state.json — orchestrator presence (heartbeat-based)
+        if self.path.startswith('/api/state.json'):
+            payload = json.dumps({
+                'me': WHO,
+                'agents': {
+                    'ferdi':   {'status': status_for('ferdi'),   'heartbeat': read_heartbeat('ferdi')},
+                    'casimir': {'status': status_for('casimir'), 'heartbeat': read_heartbeat('casimir')},
+                },
+                'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+            })
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Cache-Control', 'no-store')
